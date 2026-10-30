@@ -18,7 +18,16 @@
 
 -- Write your query below:
 
-
+select
+    p.product_name,
+    b.brand_name,
+    p.list_price
+from production.products as p
+inner join production.brands as b
+    on p.brand_id = b.brand_id
+order by 
+    b.brand_name asc,
+    p.list_price desc;
 
 
 -- ============================================================
@@ -31,7 +40,17 @@
 
 -- Write your query below:
 
-
+select
+    p.product_name,
+    b.brand_name,
+    c.category_name,
+    p.model_year
+from production.products as p
+inner join production.brands as b
+    on p.brand_id = b.brand_id
+inner join production.categories as c
+    on p.category_id = c.category_id
+where p.list_price > 1000;
 
 
 -- ============================================================
@@ -45,11 +64,28 @@
 -- ============================================================
 
 -- Part a:
-
+select
+    c.first_name,
+    c.last_name,
+    c.city,
+    o.order_id,
+    o.order_date
+from sales.customers as c
+left join sales.orders as o
+    on c.customer_id = o.customer_id
+order by 
+    c.last_name,
+    c.first_name;
 
 -- Part b:
-
-
+select
+    c.first_name,
+    c.last_name,
+    c.city
+from sales.customers as c
+left join sales.orders as o
+    on c.customer_id = o.customer_id
+where o.order_id is null;
 
 
 -- ============================================================
@@ -63,9 +99,26 @@
 -- ============================================================
 
 -- Part a:
-
+select
+    s.store_name,
+    st.first_name,
+    st.last_name
+from sales.staffs as st
+right join sales.stores as s
+    on st.store_id = s.store_id
+order by
+    s.store_name,
+    st.last_name,
+    st.first_name;
 
 -- Part b:
+select
+    p.product_name,
+    stk.quantity
+from production.products as p
+full outer join production.stocks as stk
+    on p.product_id = stk.product_id
+where stk.product_id is null;
 
 
 
@@ -84,7 +137,26 @@
 
 -- Write your query below:
 
-
+select
+    o.order_id,
+    o.order_date,
+    concat(c.first_name, ' ', c.last_name) as customer_full_name,
+    p.product_name,
+    oi.quantity,
+    cast(
+        oi.quantity * oi.list_price * (1 - oi.discount)
+        as decimal (12, 2)
+    ) as line_total
+from sales.orders as o
+inner join sales.customers as c
+    on o.customer_id = c.customer_id
+inner join sales.order_items as oi
+    on o.order_id = oi.order_id
+inner join production.products as p
+    on oi.product_id = p.product_id
+order by 
+    o.order_id,
+    p.product_name;
 
 
 -- ============================================================
@@ -97,7 +169,13 @@
 -- ============================================================
 
 -- Write your query below:
-
+select
+    count(*) as total_products,
+    min(list_price) as lowest_list_price,
+    max(list_price) as highest_list_price,
+    cast(round(avg(list_price), 2) as decimal(12, 2))
+        as average_list_price
+from production.products;
 
 
 
@@ -111,10 +189,31 @@
 -- ============================================================
 
 -- Part a:
-
+select
+    c.category_name,
+    count (p.product_id) as product_count
+from production.categories as c
+left join production.products as p
+    on c.category_id = p.category_id
+group by c.category_id, c.category_name
+order by product_count desc;
 
 -- Part b:
-
+select
+    b.brand_name,
+    p.model_year,
+    cast(round(avg(p.list_price), 2) as decimal(12, 2))
+        as average_list_price
+from production.products as p
+inner join production.brands as b
+    on p.brand_id = b.brand_id
+group by
+    b.brand_id,
+    b.brand_name,
+    p.model_year
+order by
+    b.brand_name asc,
+    p.model_year asc;
 
 
 
@@ -130,10 +229,37 @@
 -- ============================================================
 
 -- Part a:
-
+select
+    c.customer_id,
+    concat (c.first_name, ' ', c.last_name) as customer_full_name,
+    count (o.order_id) as total_orders
+from sales.customers as c
+left join sales.orders as o
+    on c.customer_id = o.customer_id
+group by
+    c.customer_id,
+    c.first_name,
+    c.last_name
+order by
+    total_orders desc,
+    c.customer_id asc;
 
 -- Part b:
-
+select
+    s.store_name,
+    cast(
+        sum(oi.quantity * oi.list_price * (1 - oi.discount))
+        as decimal(14, 2)
+    ) as total_revenue
+from sales.stores as s
+inner join sales.orders as o
+    on s.store_id = o.store_id
+inner join sales.order_items as oi
+    on o.order_id = oi.order_id
+group by
+    s.store_id,
+    s.store_name
+order by total_revenue desc;
 
 
 
@@ -148,12 +274,38 @@
 -- ============================================================
 
 -- Part a:
-
+select
+    b.brand_name,
+    count(p.product_id) as product_count
+from production.brands as b
+inner join production.products as p
+    on b.brand_id = p.brand_id
+group by
+    b.brand_id,
+    b.brand_name
+having count(p.product_id) > 20;
 
 -- Part b:
-
+select
+    concat(c.first_name, ' ', c.last_name) as customer_full_name,
+    count(o.order_id) as total_orders
+from sales.customers as c
+inner join  sales.orders as o
+    on c.customer_id = o.customer_id
+group by
+    c.customer_id,
+    c.first_name,
+    c.last_name
+having count (o.order_id) >= 3
+order by total_orders desc;
 
 -- Part c (answer as a comment):
+
+-- WHERE: Ye GROUP BY se pehle records ko filter karta hai.
+--Matlab jo records hamari condition par poore nahi utarte, unko hata deta hai.
+--
+-- HAVING: Ye GROUP BY ke baad groups ko filter karta hai. Jab hum COUNT,
+--SUM ya AVG use karte hain, to unke result par condition lagane ke liye HAVING use hota hai.
 
 
 
@@ -169,3 +321,26 @@
 -- ============================================================
 
 -- Write your query below:
+select top 5
+    p.product_name,
+    c.category_name,
+    sum(oi.quantity) as total_quantity_sold,cast(
+        sum(oi.quantity * oi.list_price * (1 - oi.discount))
+        as decimal (14, 2)
+    ) as total_revenue
+from sales.order_items as oi
+inner join sales.orders as o
+    on oi.order_id = o.order_id
+inner join production.products as p
+    on oi.product_id = p.product_id
+inner join production.categories as c
+    on p.category_id = c.category_id
+where o.order_status = 4
+group by
+    p.product_id,
+    p.product_name,
+    c.category_id,
+    c.category_name
+order by
+    total_quantity_sold desc,
+    p.product_name asc;
