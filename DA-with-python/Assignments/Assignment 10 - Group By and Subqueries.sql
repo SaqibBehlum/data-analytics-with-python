@@ -18,7 +18,13 @@
 -- ============================================================
 
 -- Write your query below:
-
+select
+    count(*)           as total_order_lines,
+    sum(quantity)      as total_units_sold,
+    avg(list_price)    as avg_list_price,
+    min(list_price)    as min_list_price,
+    max(list_price)    as max_list_price
+from sales.order_items;
 
 
 
@@ -33,14 +39,20 @@
 -- ============================================================
 
 -- Part a:
-
+select count(*) AS total_customers
+from sales.customers;
 
 -- Part b:
-
+select
+    COUNT(email) as customers_with_email,
+    count(phone) as customers_with_phone
+from sales.customers;
 
 -- Part c:
 
-
+select count(*) as customers_without_phone
+from sales.customers
+where phone is null;
 
 
 -- ============================================================
@@ -52,14 +64,24 @@
 --  c) Count the number of orders handled by each staff_id and
 --     each order_status combination.
 -- ============================================================
-
 -- Part a:
-
+select product_id, sum(quantity) as total_units_sold
+from sales.order_items
+group by product_id
+order by total_units_sold desc;
 
 -- Part b:
-
+select state, count(*) as customer_count
+from sales.customers
+group by state
+order by customer_count desc;
 
 -- Part c:
+select staff_id, order_status, count(*) as order_count
+from sales.orders
+group by staff_id, order_status
+order by staff_id, order_status;
+
 
 
 
@@ -79,12 +101,33 @@
 -- ============================================================
 
 -- Part a:
-
+select c.category_name,
+       round(avg(p.list_price), 2) as avg_list_price
+from production.products p
+join production.categories c on c.category_id = p.category_id
+group by c.category_name
+order by avg_list_price desc;
 
 -- Part b:
-
+select b.brand_name,
+       count(p.product_id) as product_count
+from production.products p
+join production.brands b on b.brand_id = p.brand_id
+group by b.brand_name
+order by product_count desc;
 
 -- Part c:
+select c.customer_id,
+       c.first_name,
+       c.last_name,
+       count(distinct o.order_id) as order_count,
+       sum(oi.quantity * oi.list_price * (1 - oi.discount)) as total_spent
+from sales.customers c
+join sales.orders o       on o.customer_id = c.customer_id
+join sales.order_items oi on oi.order_id   = o.order_id
+group by c.customer_id, c.first_name, c.last_name
+order by total_spent desc;
+
 
 
 
@@ -102,15 +145,30 @@
 -- ============================================================
 
 -- Part a:
-
+select model_year, count(*) as product_count
+from production.products
+group by model_year
+having  count(*) > 50;
 
 -- Part b:
-
+select customer_id, count(*) as order_count
+from sales.orders
+group by customer_id
+having count(*) >= 2;
 
 -- Part c:
+select product_id, sum(quantity) as total_units_sold
+from sales.order_items
+group by product_id
+having (quantity) > 100;
 
+-- Part d:{coment}
+-- WHERE filters individual rows BEFORE grouping, so it cannot see
+-- aggregate values such as COUNT(*), which only exist after the
+-- rows have been grouped. A condition on an aggregate ("more than
+-- 50 products per model_year") must go in HAVING, which filters
+-- groups AFTER GROUP BY. Aggregates are not allowed in WHERE.
 
--- Part d (answer as a comment):
 
 
 
@@ -124,10 +182,14 @@
 --  groups after grouping.
 -- ============================================================
 
--- Write your query below:
-
-
-
+select o.store_id,
+       sum(oi.quantity * oi.list_price * (1 - oi.discount)) as total_revenue
+from sales.orders o
+join sales.order_items oi on oi.order_id = o.order_id
+where year(o.order_date) = 2017                      
+group by o.store_id
+having sum(oi.quantity * oi.list_price * (1 - oi.discount)) > 100000  
+order by total_revenue desc;
 
 -- ============================================================
 --  Question 7 — Subquery in WHERE (IN)
@@ -141,12 +203,21 @@
 -- ============================================================
 
 -- Part a:
-
+select *
+from sales.orders
+where customer_id IN (select customer_id from sales.customers where city = 'New York');
 
 -- Part b:
-
+select product_id, product_name
+from production.products
+where category_id in (select category_id
+                      from production.categories
+                      where category_name in ('Electric Bikes', 'Cruisers Bicycles'));
 
 -- Part c:
+select first_name, last_name, city
+from sales.customers
+where customer_id in (select customer_id from sales.orders);
 
 
 
@@ -166,16 +237,33 @@
 --  NOT IN works correctly.
 -- ============================================================
 
--- Part a:
 
+select product_id, product_name, list_price
+from production.products
+where list_price > (select avg(list_price) from production.products);
 
 -- Part b:
+select product_id, product_name, list_price
+from production.products
+where list_price < (select avg(list_price) from production.products);
 
+select count(*) as products_below_average
+from production.products
+where list_price < (select avg(list_price) from production.products);
 
 -- Part c:
-
+select customer_id, first_name, last_name
+from sales.customers
+where customer_id not in (select customer_id
+                          from sales.orders
+                          where customer_id IS NOT NULL);
 
 -- Part d:
+select product_id, product_name
+from production.products
+where product_id not in (select product_id
+                         from sales.order_items
+                         where product_id IS NOT NULL);
 
 
 
@@ -192,9 +280,27 @@
 -- ============================================================
 
 -- Part a:
-
+select avg(order_count) as avg_orders_per_staff,
+       min(order_count) as min_orders_per_staff,
+       max(order_count) as max_orders_per_staff
+from (
+    select staff_id, count(*) as order_count
+    from sales.orders
+    group by staff_id
+) as staff_orders;
+-- Note: order_count is an INT, so AVG returns an integer in SQL Server.
+-- Use AVG(order_count * 1.0) if you want decimals.
 
 -- Part b:
+select avg(total_spent) as avg_total_spent
+from (
+    select  o.customer_id,
+           sum(oi.quantity * oi.list_price * (1 - oi.discount)) as total_spent
+    from sales.orders o
+    join sales.order_items oi on oi.order_id = o.order_id
+    group by o.customer_id
+) as  customer_totals;
+
 
 
 
@@ -212,14 +318,35 @@
 --     the overall average list_price as price_difference.
 -- ============================================================
 
--- Part a:
 
+
+-- Part a:
+select p.product_id,
+       p.product_name,
+       p.list_price,
+       (select sum(oi.quantity)
+        from sales.order_items oi
+        where oi.product_id = p.product_id) as units_sold   -- NULL if never sold
+from production.products p;
 
 -- Part b:
-
+select o.order_id,
+       o.order_date,
+       (select count(*)
+        from sales.order_items oi
+        where oi.order_id = o.order_id) as item_count,
+       (select max(oi.list_price)
+        from sales.order_items oi
+        where oi.order_id = o.order_id) as max_item_price
+from sales.orders o;
+-- item_count = number of order lines. For total units use SUM(oi.quantity).
 
 -- Part c:
-
+select product_id,
+       product_name,
+       list_price,
+       list_price - (select avg(list_price) from production.products) as price_difference
+from production.products;
 
 
 
@@ -233,4 +360,30 @@
 --  (or a derived table) that calculates the average.
 -- ============================================================
 
--- Write your query below:
+select c.customer_id,
+       c.first_name,
+       c.last_name,
+       sum(oi.quantity * oi.list_price * (1 - oi.discount)) as total_spent
+from sales.customers c
+join sales.orders o       on o.customer_id = c.customer_id
+join sales.order_items oi on oi.order_id   = o.order_id
+group by c.customer_id, c.first_name, c.last_name
+having sum(oi.quantity * oi.list_price * (1 - oi.discount)) >
+       (select avg(total_spent)
+        from (
+            select o2.customer_id,
+                   sum(oi2.quantity * oi2.list_price * (1 - oi2.discount)) as total_spent
+            from sales.orders o2
+            join sales.order_items oi2 on oi2.order_id = o2.order_id
+            group by o2.customer_id
+        ) as customer_totals)
+order by total_spent desc;
+
+
+
+
+
+
+
+
+
